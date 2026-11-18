@@ -15,9 +15,17 @@
  */
 package de.odrotbohm.restbucks;
 
+import static org.assertj.core.api.Assertions.*;
+
 import de.odrotbohm.restbucks.ModularityTests.ApplicationModulesStructureProvider.NamedInterfacesGroupingProvider;
+import de.odrotbohm.restbucks.order.Order;
+import io.namastack.outbox.annotation.OutboxEvent;
+import io.namastack.outbox.annotation.OutboxHandler;
 import lombok.RequiredArgsConstructor;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -37,6 +45,8 @@ import org.jmolecules.stereotype.catalog.StereotypeCatalog;
 import org.jmolecules.stereotype.catalog.StereotypeGroup;
 import org.jmolecules.stereotype.catalog.support.CatalogSource;
 import org.jmolecules.stereotype.catalog.support.JsonPathStereotypeCatalog;
+import org.jmolecules.stereotype.catalog.support.StereotypeDetector.AnalysisLevel;
+import org.jmolecules.stereotype.catalog.support.StereotypeMatcher;
 import org.jmolecules.stereotype.reflection.ArchUnitStereotypeFactory;
 import org.jmolecules.stereotype.reflection.ArchUnitStructureProvider;
 import org.jmolecules.stereotype.reflection.ReflectionStereotypeFactory;
@@ -49,6 +59,7 @@ import org.jmolecules.stereotype.tooling.SpringLabelUtils;
 import org.jmolecules.stereotype.tooling.StructureProvider;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.annotation.MergedAnnotations;
 import org.springframework.modulith.core.ApplicationModule;
 import org.springframework.modulith.core.ApplicationModules;
 import org.springframework.modulith.core.FormattableType;
@@ -87,7 +98,7 @@ class ModularityTests {
 	void renderSpringBootProject() {
 
 		var source = CatalogSource.ofClassLoader(ModularityTests.class.getClassLoader());
-		var catalog = new JsonPathStereotypeCatalog(source);
+		var catalog = stereotypeCatalog(source);
 		var factory = new ReflectionStereotypeFactory(catalog);
 
 		System.out.println(catalog);
@@ -118,7 +129,7 @@ class ModularityTests {
 	void renderSpringModulithProject() {
 
 		var source = CatalogSource.ofClassLoader(ModularityTests.class.getClassLoader());
-		var catalog = new JsonPathStereotypeCatalog(source);
+		var catalog = stereotypeCatalog(source);
 
 		System.out.println(catalog);
 
@@ -152,6 +163,52 @@ class ModularityTests {
 		// System.out.println(jsonHandler.toString());
 		System.out.println(handler.getWriter().toString());
 	}
+
+	@Test
+	void detectsStereotypesAlongsideKotlinAnnotations() throws Exception {
+
+		var source = CatalogSource.ofClassLoader(ModularityTests.class.getClassLoader());
+		var factory = new ReflectionStereotypeFactory(stereotypeCatalog(source));
+
+		assertThat(factory.fromType(KotlinAnnotatedEvent.class).stream())
+				.extracting(Stereotype::getIdentifier).contains("events.DomainEvent");
+		assertThat(factory.fromType(Order.OrderPaid.class).stream())
+				.extracting(Stereotype::getIdentifier).contains("events.DomainEvent");
+		assertThat(factory.fromMethod(KotlinAnnotatedEvent.class.getDeclaredMethod("handle")).stream())
+				.extracting(Stereotype::getIdentifier).contains("events.DomainEventHandler");
+	}
+
+	private static JsonPathStereotypeCatalog stereotypeCatalog(CatalogSource source) {
+
+		// Workaround for https://github.com/xmolecules/jmolecules-integrations/issues/422.
+		return new JsonPathStereotypeCatalog(source) {
+
+			@Override
+			public <T, A> List<Stereotype> getAnnotationBasedStereotypes(A element, AnalysisLevel level,
+					StereotypeMatcher<T, A> matcher) {
+
+				var cycleSafeMatcher = StereotypeMatcher.<T, A> isAnnotatedWith((candidate, annotation) ->
+						MergedAnnotations.from((AnnotatedElement) candidate, MergedAnnotations.SearchStrategy.DIRECT)
+								.isPresent(annotation))
+						.orImplements((type, name) -> false);
+
+				return super.getAnnotationBasedStereotypes(element, level, cycleSafeMatcher);
+			}
+		};
+	}
+
+	@org.jmolecules.event.annotation.DomainEvent
+	@OutboxEvent(key = "'test'")
+	static class KotlinAnnotatedEvent {
+
+		@ComposedEventHandler
+		@OutboxHandler(id = "test.handler")
+		void handle() {}
+	}
+
+	@org.jmolecules.event.annotation.DomainEventHandler
+	@Retention(RetentionPolicy.RUNTIME)
+	@interface ComposedEventHandler {}
 
 	class StereotypeFactoryAdapter implements StereotypeFactory<JavaPackage, Class<?>, Method> {
 

@@ -20,7 +20,10 @@ import static org.assertj.core.api.Assertions.*;
 import de.odrotbohm.restbucks.dashboard.Dashboard;
 import de.odrotbohm.restbucks.order.Order.OrderIdentifier;
 import de.odrotbohm.restbucks.order.Order.OrderPaid;
+import io.namastack.outbox.handler.OutboxRecordMetadata;
 
+import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 import org.javamoney.moneta.Money;
@@ -42,14 +45,16 @@ class DashboardUnitTests {
 		var identifier = new OrderIdentifier(UUID.randomUUID());
 		var amount = Money.of(4.20d, "EUR");
 		var event = new OrderPaid(identifier, amount);
+		var metadata = new OutboxRecordMetadata("order:" + identifier.id(), "dashboard.record-order-revenue",
+				Instant.now(), Map.of(), 0, UUID.randomUUID().toString(), "default");
 
-		dashboard.on(event);
+		dashboard.on(event, metadata);
 
 		assertThat(dashboard.statistics()).hasEntrySatisfying("revenue", it -> {
 			assertThat(it).isEqualTo(amount);
 		});
 
-		dashboard.on(event);
+		dashboard.on(event, metadata);
 
 		assertThat(dashboard.statistics()).hasEntrySatisfying("revenue", it -> {
 			assertThat(it).isEqualTo(amount.multiply(2));
@@ -59,7 +64,7 @@ class DashboardUnitTests {
 	@Test
 	void registersStatisticsLinkWithRootApiResource() {
 
-		var result = dashboard.process(new RepositoryLinksResource());
+		var result = new Dashboard.StatisticsLinks().process(new RepositoryLinksResource());
 
 		assertThat(result.getLink("statistics")).isPresent();
 	}

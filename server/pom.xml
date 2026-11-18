@@ -21,7 +21,9 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
 		<java.version>25</java.version>
 		<jmolecules.version>2025.0.2</jmolecules.version>
 		<spring-modulith.version>2.1.0-RC1</spring-modulith.version>
-		
+		<namastack-outbox.version>1.11.1-SNAPSHOT</namastack-outbox.version>
+		<namastack-once.version>0.1.0-SNAPSHOT</namastack-once.version>
+
 		<!-- Enable full annotation processing on Java 23+ -->
 		<maven.compiler.proc>full</maven.compiler.proc>
 	</properties>
@@ -104,11 +106,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
 
 		<dependency>
 			<groupId>org.springframework.modulith</groupId>
-			<artifactId>spring-modulith-starter-jdbc</artifactId>
-		</dependency>
-
-		<dependency>
-			<groupId>org.springframework.modulith</groupId>
 			<artifactId>spring-modulith-observability-api</artifactId>
 		</dependency>
 
@@ -157,6 +154,20 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
 			<groupId>de.odrotbohm.playground</groupId>
 			<artifactId>spring-web-tools</artifactId>
 			<version>0.2.0</version>
+		</dependency>
+
+		<!-- Namastack -->
+
+		<dependency>
+			<groupId>io.namastack</groupId>
+			<artifactId>namastack-once-starter-jdbc</artifactId>
+			<version>${namastack-once.version}</version>
+		</dependency>
+
+		<dependency>
+			<groupId>io.namastack</groupId>
+			<artifactId>namastack-outbox-starter-jdbc</artifactId>
+			<version>${namastack-outbox.version}</version>
 		</dependency>
 
 		<!-- Database -->
@@ -257,6 +268,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/ma
 			<id>observability</id>
 
 			<dependencies>
+
+				<dependency>
+					<groupId>io.namastack</groupId>
+					<artifactId>namastack-outbox-observability</artifactId>
+					<version>${namastack-outbox.version}</version>
+				</dependency>
 
 				<dependency>
 					<groupId>org.springframework.modulith</groupId>

@@ -17,6 +17,7 @@ package de.odrotbohm.restbucks.order;
 
 import de.odrotbohm.restbucks.drinks.Drink;
 import de.odrotbohm.restbucks.order.Order.OrderIdentifier;
+import io.namastack.outbox.annotation.OutboxEvent;
 import jakarta.persistence.Column;
 import jakarta.persistence.OrderColumn;
 import jakarta.persistence.Table;
@@ -254,6 +255,7 @@ public class Order extends AbstractAggregateRoot<Order> implements AggregateRoot
 	 * @author Oliver Drotbohm
 	 * @author Stéphane Nicoll
 	 */
+	@OutboxEvent(key = "'order:' + #this.orderIdentifier.id.toString()")
 	public record OrderPaid(OrderIdentifier orderIdentifier, MonetaryAmount total) implements DomainEvent {}
 
 	/**

@@ -27,7 +27,9 @@ import java.util.concurrent.ThreadLocalRandom;
 
 import org.jmolecules.ddd.annotation.Service;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.modulith.events.ApplicationModuleListener;
+import io.namastack.once.annotation.Idempotent;
+import io.namastack.outbox.annotation.OutboxHandler;
+import io.namastack.outbox.handler.OutboxRecordMetadata;
 
 /**
  * Simple {@link OrderPaid} listener marking the according {@link Order} as in process, sleeping for 5 seconds and
@@ -52,8 +54,9 @@ class Engine {
 	 *
 	 * @param event must not be {@literal null}.
 	 */
-	@ApplicationModuleListener
-	public void handleOrderPaidEvent(OrderPaid event) {
+	@Idempotent(scope = "engine.prepare-order", key = "#metadata.recordId")
+	@OutboxHandler(id = "engine.prepare-order")
+	public void handleOrderPaidEvent(OrderPaid event, OutboxRecordMetadata metadata) {
 
 		if (settings.isFailRandomly()) {
 			int i = RANDOM.nextInt(0, 9);

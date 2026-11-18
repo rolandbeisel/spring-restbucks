@@ -15,11 +15,16 @@
  */
 package de.odrotbohm.restbucks;
 
+import io.namastack.outbox.JacksonOutboxPayloadSerializer;
+import io.namastack.outbox.OutboxPayloadSerializer;
 import tools.jackson.core.JacksonException;
 import tools.jackson.core.JsonGenerator;
+import tools.jackson.core.JsonParser;
 import tools.jackson.databind.DeserializationContext;
 import tools.jackson.databind.SerializationContext;
 import tools.jackson.databind.deser.ValueInstantiator.Base;
+import tools.jackson.databind.deser.std.StdDeserializer;
+import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.module.SimpleModule;
 import tools.jackson.databind.ser.std.StdSerializer;
 
@@ -49,6 +54,14 @@ class JacksonCustomizations {
 		return new MoneyModule();
 	}
 
+	@Bean
+	OutboxPayloadSerializer outboxPayloadSerializer(JsonMapper mapper) {
+		return new JacksonOutboxPayloadSerializer(mapper.rebuild().addModule(new OutboxMoneyModule()).build());
+	}
+
+	/**
+	 * Locale-dependent money formatting for the HTTP API.
+	 */
 	@SuppressWarnings("serial")
 	static class MoneyModule extends SimpleModule {
 
@@ -133,6 +146,43 @@ class JacksonCustomizations {
 			@Override
 			public Object createFromString(DeserializationContext ctxt, String value) throws JacksonException {
 				return Money.parse(value, MonetaryFormats.getAmountFormat(LocaleContextHolder.getLocale()));
+			}
+		}
+	}
+
+	/**
+	 * Locale-independent money format, registered only on the Outbox mapper copy.
+	 */
+	@SuppressWarnings("serial")
+	private static class OutboxMoneyModule extends SimpleModule {
+
+		OutboxMoneyModule() {
+			super("outbox-money");
+			addSerializer(MonetaryAmount.class, new OutboxMoneySerializer());
+			addDeserializer(MonetaryAmount.class, new OutboxMoneyDeserializer());
+		}
+
+		private static class OutboxMoneySerializer extends StdSerializer<MonetaryAmount> {
+
+			OutboxMoneySerializer() {
+				super(MonetaryAmount.class);
+			}
+
+			@Override
+			public void serialize(MonetaryAmount amount, JsonGenerator generator, SerializationContext context) {
+				generator.writeString(amount.getCurrency().getCurrencyCode() + " " + amount.getNumber());
+			}
+		}
+
+		private static class OutboxMoneyDeserializer extends StdDeserializer<MonetaryAmount> {
+
+			OutboxMoneyDeserializer() {
+				super(MonetaryAmount.class);
+			}
+
+			@Override
+			public MonetaryAmount deserialize(JsonParser parser, DeserializationContext context) {
+				return Money.parse(parser.getString());
 			}
 		}
 	}

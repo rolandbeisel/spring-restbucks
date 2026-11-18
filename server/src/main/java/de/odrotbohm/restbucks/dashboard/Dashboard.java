@@ -28,7 +28,10 @@ import javax.money.MonetaryAmount;
 import org.javamoney.moneta.Money;
 import org.springframework.data.rest.webmvc.RepositoryLinksResource;
 import org.springframework.hateoas.server.RepresentationModelProcessor;
-import org.springframework.modulith.events.ApplicationModuleListener;
+import org.springframework.stereotype.Component;
+import io.namastack.once.annotation.Idempotent;
+import io.namastack.outbox.annotation.OutboxHandler;
+import io.namastack.outbox.handler.OutboxRecordMetadata;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -44,7 +47,7 @@ import org.springframework.web.bind.annotation.RestController;
  */
 @RestController
 @RequiredArgsConstructor
-class Dashboard implements RepresentationModelProcessor<RepositoryLinksResource> {
+class Dashboard {
 
 	private MonetaryAmount revenue = Money.zero(Currencies.EURO);
 
@@ -53,16 +56,19 @@ class Dashboard implements RepresentationModelProcessor<RepositoryLinksResource>
 		return Map.of("revenue", revenue);
 	}
 
-	@ApplicationModuleListener
-	void on(OrderPaid event) {
+	@OutboxHandler(id = "dashboard.record-order-revenue")
+	@Idempotent(scope = "dashboard.record-order-revenue", key = "#metadata.recordId")
+	public void on(OrderPaid event, OutboxRecordMetadata metadata) {
 		this.revenue = revenue.add(event.total());
 	}
 
-	/*
-	 * (non-Javadoc)
-	 * @see org.springframework.hateoas.server.RepresentationModelProcessor#process(org.springframework.hateoas.RepresentationModel)
-	 */
-	public RepositoryLinksResource process(RepositoryLinksResource model) {
-		return model.add(linkTo(methodOn(Dashboard.class).statistics()).withRel("statistics"));
+	// Keep the generic model processor outside the Once and controller tracing proxy.
+	@Component
+	static class StatisticsLinks implements RepresentationModelProcessor<RepositoryLinksResource> {
+
+		@Override
+		public RepositoryLinksResource process(RepositoryLinksResource model) {
+			return model.add(linkTo(methodOn(Dashboard.class).statistics()).withRel("statistics"));
+		}
 	}
 }
